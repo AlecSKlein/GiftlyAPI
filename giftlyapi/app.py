@@ -6,9 +6,9 @@ import json
 import modules.giftlydb as giftlydb
 import modules.formatting as formatting
 
-AMAZON_SECRET_KEY="vB/3Wi1RAF1Y/Qx3PQi1vl71UOyXswo22S/kezG+"
-AMAZON_ACCESS_KEY="AKIAJLEJV5NUW2BVBLEA"
-AMAZON_ASSOC_TAG="giftly-0620"
+AMAZON_SECRET_KEY=""
+AMAZON_ACCESS_KEY=""
+AMAZON_ASSOC_TAG=""
 
 amazon = AmazonAPI(AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
 conn = sqlite3.connect('giftly.db')
