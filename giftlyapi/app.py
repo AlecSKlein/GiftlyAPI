@@ -2,6 +2,7 @@
 from flask import Flask, jsonify, request
 from amazon.api import AmazonAPI
 import sqlite3
+import json
 import modules.giftlydb as giftlydb
 import modules.formatting as formatting
 
@@ -63,18 +64,31 @@ def register_user(fname, lname, email, password, cpassword):
     else:
         return "Missing fields: " + ', '.join(missing_fields)
 
-@app.route('/api/user/<email>/addfriend', methods=['PUT'])
-def add_user_friend(userid):
-    pass
+@app.route('/api/user/<userid>/friends/addfriend/<name>', methods=['GET'])
+def add_user_friend(userid, name):
+    print name
+    name = formatting.stringify_sql(name)
+    if giftlydb.insert_friend((giftlydb.generate_uuid(), userid, name, '1')):
+        return "Success"
+    else:
+        return "Failure"
 
-@app.route('/api/user/<email>/friends/getfriends', methods=['GET'])
+@app.route('/api/user/<userid>/friends/getfriends', methods=['GET'])
 def get_user_friends(userid):
     if userid:
-        giftlydb.select_values(values="FRIENDID, NAME, STATE")
+        values = giftlydb.select_values(values="FRIENDID, NAME, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid)))
+        if values:
+            return json.dumps(giftlydb.row_to_dict(values))
+        else:
+            return "User has no associated friends"
+    else:
+        return "User does not exist"
 
 @app.route('/api/user/<userid>/friends/<friendid>', methods=['GET'])
 def get_user_friend(userid, friendid):
-    pass
+    if userid and friendid:
+        value = giftlydb.select_values(values="NAME, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid) + "AND FRIENDID="+formatting.stringify_sql(friendid)))
+        return json.dumps(giftlydb.row_to_dict(value))
 
 if __name__ == '__main__':
 	app.run(debug=True)
