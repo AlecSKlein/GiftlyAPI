@@ -29,25 +29,14 @@ def get_connection():
 def _init_db(conn):
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS User(USERID INTEGER UNIQUE, EMAIL TEXT PRIMARY KEY, FNAME TEXT, LNAME TEXT, PASSWORD TEXT, STATE INTEGER)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS Friend(FRIENDID INTEGER PRIMARY KEY, USERID INTEGER REFERENCES User(USERID), NAME TEXT, STATE INTEGER)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS Friend(FRIENDID INTEGER PRIMARY KEY, USERID INTEGER REFERENCES User(USERID), NAME TEXT, DOB TEXT, STATE INTEGER)")
     cursor.execute("CREATE TABLE IF NOT EXISTS Interest(INTERESTNAME TEXT PRIMARY KEY, FRIENDID INTEGER REFERENCES Friend(FRIENDID),  STATE INTEGER)")
     cursor.execute("CREATE TABLE IF NOT EXISTS Gift(ASIN TEXT PRIMARY KEY, FRIENDID INTEGER REFERENCES Friend(FRIENDID), DESCRIPTION TEXT,  STATE INTEGER)")
     conn.commit()
 
-def _insert_samples():
-    conn = _connect_db()
-    _init_db(conn)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO User(USERID, EMAIL, FNAME, LNAME, PASSWORD, STATE) VALUES(1, 'Alec@gmail.com', 'Alec', 'Klein', 'MyPassword', 1)")
-    cursor.execute("INSERT INTO Friend(FRIENDID, EMAIL, NAME, STATE) VALUES(2, 1, 'Justin', 1)")
-    cursor.execute("INSERT INTO Friend(FRIENDID, EMAIL, NAME, STATE) VALUES(3, 1, 'Mike', 1)")
-    cursor.execute("INSERT INTO Friend(FRIENDID, EMAIL, NAME, STATE) VALUES(4, 1, 'Tom', 1)")
-    conn.commit()
-    conn.close()
-
 def execute_insertion_command(sqlcommand):
     try:
-        conn = _connect_db()
+        conn = get_connection()
         _init_db(conn)
         cursor = conn.cursor()
         cursor.execute(sqlcommand)
@@ -64,7 +53,7 @@ def execute_insertion_command(sqlcommand):
 
 def execute_fetch_command(sqlcommand):
     try:
-        conn = _connect_db()
+        conn = get_connection()
         _init_db(conn)
         cursor = conn.cursor()
         cursor.execute(sqlcommand)
@@ -103,7 +92,7 @@ def insert_user(values):
 
 def insert_friend(values):
     table = 'Friend'
-    valuenames = ('FRIENDID', 'USERID', 'NAME', 'STATE')
+    valuenames = ('FRIENDID', 'USERID', 'NAME', 'DOB', 'STATE')
     if not row_exists('USERID', 'User', where=("USERID="+str(values[1]))):
         return False
     elif row_exists('FRIENDID', 'Friend', where=("FRIENDID="+str(values[0]))):
@@ -111,6 +100,23 @@ def insert_friend(values):
         insert_friend(new_values)
     else:
         return insert_column(table, valuenames, values)
+
+def insert_interest(values):
+    table = 'Interest'
+    valuenames = ('INTERESTNAME', 'FRIENDID', 'STATE')
+    return insert_column(table, valuenames, values)
+
+def insert_gift(values):
+    table = 'Gift'
+    valuenames = ('ASIN', 'FRIENDID', 'DESCRIPTION', 'STATE')
+    return insert_column(table, valuenames, values)
+
+
+def get_friendid_by_name_and_dob(userid, name, dob):
+    name = formatting.stringify_sql(name)
+    dob = formatting.stringify_sql(dob)
+    friendid = select_values("FRIENDID", "FRIEND", where="USERID="+userid+" AND NAME="+name+" AND DOB="+dob)
+    return friendid
 
 def select_values(values, table, where=None):
     sqlcommand = "SELECT " + values + " FROM " + table
@@ -121,7 +127,7 @@ def select_values(values, table, where=None):
 
 def row_exists(value, table, where):
     sqlcommand = "SELECT " + value + " FROM " + table + " WHERE " + where
-    conn = _connect_db()
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(sqlcommand)
     conn.commit()
