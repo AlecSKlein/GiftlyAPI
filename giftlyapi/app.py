@@ -35,6 +35,8 @@ app = Flask(__name__)
 def index():
 	return "Index"
 
+#LOGIN/REGISTRATION
+
 @app.route('/api/user/registeruser', methods = ['POST'])
 def register_user_():
     email = request.json.get('email')
@@ -68,18 +70,12 @@ def login_user():
 
     return jsonify({'authenticated':login_auth, 'response':200})
 
-@app.route('/api/lookup/similar/', methods=['GET'])
-def get_similar_items():
-	items = str(request.form.get('items')).split(',') if request.form.get('items') else None
-	numitems = int(request.form.get('numitems')) if request.form.get('numitems') else 10
-	category = str(request.form.get('category')) if request.form.get('category') else 'All'
+#LOGIN/REGISTRATION
+#
+#USER METHODS
 
-	products = amazon.search_n(numitems, Keywords=items, SearchIndex=category)
-	product_dict = {}
-	for product in products:
-		product_dict[product.asin] = product.title
-	return jsonify({'results': product_dict})
-
+#Add a friend to the user based on userid
+#Takes userid, name, and dob
 #DOB (date of birth) is stored in the format: MM/DD/YYYY
 @app.route('/api/user/addfriend', methods=['POST'])
 def add_user_friend():
@@ -94,23 +90,36 @@ def add_user_friend():
 
     return jsonify({'inserted':success, 'response': 200})
 
-@app.route('/api/user/<userid>/friends/getfriends', methods=['GET'])
-def get_user_friends(userid):
+#OUTDATED method to get all friend details of a user based on userid
+@app.route('/api/user/getallfriends', methods=['POST'])
+def get_user_friends():
+    js = request.get_json(force=True)
+    userid = js.get('userid')
+    friendid = js.get('friendid')
     if userid:
         values = giftlydb.select_values(values="FRIENDID, NAME, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid)))
         if values:
             return json.dumps(giftlydb.row_to_dict(values))
         else:
-            return "User has no associated friends"
+            return jsonify({"userid":userid, "friendid":friendid, "numfriends":0, "response":200})
     else:
-        return "User does not exist"
+        return jsonify({"userid":userid, "friendid":friendid, "exists":"False", "response":200})
 
-@app.route('/api/user/<userid>/friends/<friendid>', methods=['GET'])
-def get_user_friend(userid, friendid):
+#Get friend details based on userid and friendid
+@app.route('/api/user/getfriendinfo', methods=['POST'])
+def get_user_friend():
+    js = request.get_json(force=True)
+    userid = js.get('userid')
+    friendid = js.get('friendid')
     if userid and friendid:
-        value = giftlydb.select_values(values="NAME, DOB, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid) + "AND FRIENDID="+formatting.stringify_sql(friendid)))
+        value = giftlydb.select_values(values="NAME, DOB, STATE", table="Friend", where=("USERID="+userid + "AND FRIENDID="+friendid))
         return json.dumps(giftlydb.row_to_dict(value))
+    else:
+        return jsonify({"userid":userid, "friendid":friendid, "exists":"False", "response":200})
 
+#Get friendid based on userid, name, and dob
+#NOTE: if 2+ friends share the same name and dob, all will be returned
+#The end user will have to decide which friend is intended
 @app.route('/api/user/getfriendid', methods=['POST'])
 def get_user_friend_id():
     js = request.get_json(force=True)
@@ -121,8 +130,28 @@ def get_user_friend_id():
     ids = []
     for i, fid in enumerate(fids):
         ids.append(fids[i]['FRIENDID'])
-    return jsonify({'friendid':ids, 'numids':len(ids)+1, 'respone':200})
+    return jsonify({'friendid':ids, 'numids':len(ids), 'response':200})
 
+#Performs a logical delete on a given user
+@app.route('/api/user/deleteuser', methods=['POST'])
+def delete_user():
+    js = request.get_json(force=True)
+    userid = js.get('userid')
+    giftlydb.change_row_state('User', '0', 'USERID='+userid)
+    return jsonify({"userid":userid, "deleted":"True", "response":200})
+
+@app.route('/api/user/reactivateuser', methods=['POST'])
+def reactivate_user():
+    js = request.get_json(force=True)
+    userid = js.get('userid')
+    giftlydb.change_row_state('User', '1', 'USERID='+userid)
+    return jsonify({"userid":userid, "reactivated":"True", "response":200})
+
+#USER METHODS
+#
+#FRIEND METHODS
+
+#Add an interest to a friend based on friendid
 @app.route('/api/user/friend/addinterest', methods=['POST'])
 def add_friend_interest():
     js = request.get_json(force=True)
@@ -133,6 +162,24 @@ def add_friend_interest():
     else:
         return abort(400)
 
+#Performs a logical delete on a given friend
+#Friend is identified uniquely by friendid, does not require userid for identification
+@app.route('/api/user/friend/deletefriend', methods=['POST'])
+def delete_friend():
+    js = request.get_json(force=True)
+    friendid = js.get('friendid')
+    giftlydb.update_table(table='Friend', set='STATE=0', where="FRIENDID=" + friendid)
+    return jsonify({"friendid":friendid, "deleted":"True", "response":200})
+
+#Undoes a logical delete on a given friend
+#Friend is identified uniquely by friendid, does not require userid for identification
+@app.route('/api/user/friend/reactivatefriend', methods=['POST'])
+def reactivate_friend():
+    js = request.get_json(force=True)
+    friendid = js.get('friendid')
+    giftlydb.change_row_state(table='Friend', state='1', where="FRIENDID=" +friendid)
+    return jsonify({"friendid":friendid, "reactivated":"True", "response":200})
+
 @app.route('/api/user/friend/addgift', methods=['POST'])
 def add_friend_gift():
     js = request.get_json(force=True)
@@ -140,9 +187,27 @@ def add_friend_gift():
     friendid = formatting.stringify_sql(js.get('friendid'))
     description = formatting.stringify_sql(js.get('description'))
     if giftlydb.insert_gift((asin, friendid, description, '1')):
-        return jsonify({'friendid':friendid, 'asin':asin, 'response':200})
+        return jsonify({"friendid":friendid, "asin":asin, "response":200})
     else:
         return abort(400)
+
+#FRIEND METHODS
+#
+#AMAZON API CALLS
+
+@app.route('/api/lookup/similar/', methods=['GET'])
+def get_similar_items():
+	items = str(request.form.get('items')).split(',') if request.form.get('items') else None
+	numitems = int(request.form.get('numitems')) if request.form.get('numitems') else 10
+	category = str(request.form.get('category')) if request.form.get('category') else 'All'
+
+	products = amazon.search_n(numitems, Keywords=items, SearchIndex=category)
+	product_dict = {}
+	for product in products:
+		product_dict[product.asin] = product.title
+	return jsonify({'results': product_dict})
+
+#AMAZON API CALLS
 
 if __name__ == '__main__':
 	app.run(debug=True)

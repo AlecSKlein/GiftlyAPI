@@ -112,20 +112,33 @@ def insert_gift(values):
     return insert_column(table, valuenames, values)
 
 
-def get_friendid_by_name_and_dob(userid, name, dob):
+def get_friendid_by_name_and_dob(userid, name, dob, state=1):
     name = formatting.stringify_sql(name)
     dob = formatting.stringify_sql(dob)
-    friendid = select_values("FRIENDID", "FRIEND", where="USERID="+userid+" AND NAME="+name+" AND DOB="+dob)
+    friendid = select_values("FRIENDID", "FRIEND", where="USERID="+userid+" AND NAME="+name+" AND DOB="+dob, state=state)
     return friendid
 
-def select_values(values, table, where=None):
+def update_table(table, set, where):
+    sqlcommand = "UPDATE " + table + " SET " + set + " WHERE " + where
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(sqlcommand)
+    conn.commit()
+
+def change_row_state(table, state, where):
+    update_table(table, "SET STATE="+state, where)
+
+def select_values(values, table, where=None, state='1'):
     sqlcommand = "SELECT " + values + " FROM " + table
     if where:
         sqlcommand += " WHERE " + where
+    if state is not None:
+        sqlcommand += " AND STATE=" + state
     val = execute_fetch_command(sqlcommand)
     return val
 
-def row_exists(value, table, where):
+def row_exists(value, table, where, state=1):
+    where = where + " AND STATE=" + state
     sqlcommand = "SELECT " + value + " FROM " + table + " WHERE " + where
     conn = get_connection()
     cursor = conn.cursor()
