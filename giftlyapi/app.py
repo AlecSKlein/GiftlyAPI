@@ -37,12 +37,19 @@ def index():
 
 #LOGIN/REGISTRATION
 
+@app.route('/api/user/getusers', methods = ['GET'])
+def test():
+    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, PASSWORD, STATE", table="User")
+    if values:
+        return jsonify({"users":giftlydb.row_to_dict(values)})
+
 @app.route('/api/user/registeruser', methods = ['POST'])
 def register_user_():
-    email = request.json.get('email')
-    password = request.json.get('password')
-    fname = request.json.get('fname')
-    lname = request.json.get('lname')
+    js = request.get_json(force=True)
+    email = js.get('email')
+    password = js.get('password')
+    fname = js.get('fname')
+    lname = js.get('lname')
 
     #Missing arguments
     if not email or not password or not fname or not lname:
@@ -56,10 +63,11 @@ def register_user_():
     else:
         return abort(400)
 
-@app.route('/api/user/loginuser', methods = ['GET'])
+@app.route('/api/user/loginuser', methods = ['POST'])
 def login_user():
-    email = request.json.get('email')
-    password = request.json.get('password')
+    js = request.get_json(force=True)
+    email = js.get('email')
+    password = js.get('password')
     hashed_password = giftlydb.select_values("PASSWORD", "USER", "EMAIL=" + formatting.stringify_sql(email))[0]['PASSWORD']
 
     login_auth = None
@@ -95,15 +103,15 @@ def add_user_friend():
 def get_user_friends():
     js = request.get_json(force=True)
     userid = js.get('userid')
-    friendid = js.get('friendid')
+    #friendid = js.get('friendid')
     if userid:
-        values = giftlydb.select_values(values="FRIENDID, NAME, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid)))
+        values = giftlydb.select_values(values="FRIENDID, USERID, NAME, DOB, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid)))
         if values:
-            return json.dumps(giftlydb.row_to_dict(values))
+            return jsonify({"friends":giftlydb.row_to_dict(values)})
         else:
-            return jsonify({"userid":userid, "friendid":friendid, "numfriends":0, "response":200})
+            return jsonify({"userid":userid, "numfriends":0, "response":200})
     else:
-        return jsonify({"userid":userid, "friendid":friendid, "exists":"False", "response":200})
+        return jsonify({"userid":userid, "exists":"False", "response":200})
 
 #Get friend details based on userid and friendid
 @app.route('/api/user/getfriendinfo', methods=['POST'])
@@ -210,4 +218,4 @@ def get_similar_items():
 #AMAZON API CALLS
 
 if __name__ == '__main__':
-	app.run(debug=True)
+	app.run(host='0.0.0.0', debug=True)
