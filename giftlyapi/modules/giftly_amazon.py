@@ -4,6 +4,14 @@
 __author__ = 'Alec'
 
 from amazon.api import AmazonAPI
+import json
+
+class AmazonProduct:
+    def __init__(self, asin, title):
+        self.product = {"asin": asin, "title": title}
+
+    def get_product(self):
+        return self.product
 
 class GiftlyAmazonAPI:
 
@@ -22,6 +30,7 @@ class GiftlyAmazonAPI:
                               'sku', 'small_image_url', 'tiny_image_url', 'title',
                               'to_string', 'upc']
 
+
     amazon_search_index = ['All','Apparel','Appliances','ArtsAndCrafts','Automotive', 'Baby',
                            'Beauty','Blended','Books','Classical','Collectibles','DVD',
                            'DigitalMusic','Electronics', 'GiftCards','GourmetFood','Grocery',
@@ -38,7 +47,7 @@ class GiftlyAmazonAPI:
     #Returns a dictionary of products mapped as ASIN:TITLE
     #Can Android parse for keys? We'll find out...
     def get_similar_items(self, keywords, numitems=None, category=None):
-        keywords = keywords.split(',') if keywords else None
+        keywords = keywords if keywords else None
         numitems = numitems if numitems else 10
         category = category if category else 'All'
 
@@ -52,11 +61,16 @@ class GiftlyAmazonAPI:
 
     def get_item_by_asin(self, asin):
         product = self.amazon.lookup(ItemId=asin)
-        return product
+        product = AmazonProduct(product.asin, product.title)
+        return product.get_product()
 
     #asin_list is a list of individual asin strings
     #they are joined together as one large string
     def get_items_by_asin(self, asin_list):
-        products = self.amazon.lookup(ItemId=(','.join(asin_list)))
-        return products
+        product_list = []
+        products = self.amazon.lookup(ItemId=(asin_list))
+        for product in products:
+            product_list.append(AmazonProduct(product.asin, product.title).get_product())
+        print product_list
+        return product_list
 

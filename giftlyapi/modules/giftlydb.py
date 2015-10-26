@@ -38,7 +38,7 @@ def _init_db(conn):
     cursor.execute(
         "CREATE TABLE IF NOT EXISTS Interest(INTERESTNAME TEXT PRIMARY KEY, FRIENDID INTEGER REFERENCES Friend(FRIENDID),  STATE INTEGER)")
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS Gift(ASIN TEXT PRIMARY KEY, FRIENDID INTEGER REFERENCES Friend(FRIENDID), DESCRIPTION TEXT,  STATE INTEGER)")
+        "CREATE TABLE IF NOT EXISTS Gift(ASIN TEXT PRIMARY KEY, FRIENDID INTEGER REFERENCES Friend(FRIENDID), TITLE TEXT,  STATE INTEGER)")
     conn.commit()
 
 
@@ -122,7 +122,7 @@ def insert_interest(values):
 
 def insert_gift(values):
     table = 'Gift'
-    valuenames = ('ASIN', 'FRIENDID', 'DESCRIPTION', 'STATE')
+    valuenames = ('ASIN', 'FRIENDID', 'TITLE', 'STATE')
     return insert_column(table, valuenames, values)
 
 

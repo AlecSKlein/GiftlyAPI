@@ -4,7 +4,6 @@
 
 from flask import Flask, jsonify, request, abort, Response
 from functools import wraps
-from amazon.api import AmazonAPI
 from Crypto.Cipher import AES
 import sqlite3
 import json
@@ -13,6 +12,7 @@ import modules.giftlydb as giftlydb
 import modules.formatting as formatting
 import modules.encryption as encryption
 import modules.authdb as authdb
+from modules.giftly_amazon import GiftlyAmazonAPI
 
 #Open the config file
 with open('config.json') as config_json:
@@ -28,7 +28,7 @@ INIT_VECTOR = data['encryption']['init_vec']
 AES_MODE = AES.MODE_CFB
 HASH_KEY = data['encryption']['hash_key']
 
-amazon = AmazonAPI(AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
+amazon = GiftlyAmazonAPI(AMAZON_SECRET_KEY, AMAZON_ACCESS_KEY, AMAZON_ASSOC_TAG)
 conn = sqlite3.connect('giftly.db')
 c = conn.cursor()
 
@@ -203,13 +203,27 @@ def get_similar_items():
     numitems = int(request.args.get('numitems')) if request.args.get('numitems') else 10
     category = str(request.args.get('category')) if request.args.get('category') else 'All'
 
-    print "%d items found with keywords %s in the %s category" % (numitems, keywords, category)
+    product_dict = amazon.get_similar_items(keywords, numitems=numitems, category=category)
 
-    products = amazon.search_n(numitems, Keywords=keywords, SearchIndex=category)
-    product_dict = {}
-    for product in products:
-        product_dict[product.asin] = product.title
     return jsonify({'results': product_dict})
+
+@app.route('/api/lookup/asin/', methods=['GET'])
+def get_specific_item():
+    asin = str(request.args.get('asin')) if request.args.get('asin') else None
+    if asin:
+        product = amazon.get_item_by_asin(asin)
+        return jsonify({'product': product})
+    else:
+        return abort(404)
+
+@app.route('/api/lookup/asins/', methods=['GET'])
+def get_specific_items():
+    asins = str(request.args.get('asins')) if request.args.get('asins') else None
+    if asins:
+        product = amazon.get_items_by_asin(asins)
+        return jsonify({'products': product})
+    else:
+        return abort(404)
 
 #AMAZON API CALLS
 
