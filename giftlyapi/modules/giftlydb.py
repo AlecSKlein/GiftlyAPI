@@ -126,14 +126,6 @@ def insert_gift(values):
     return insert_column(table, valuenames, values)
 
 
-def get_friendid_by_name_and_dob(userid, name, dob, state=1):
-    name = formatting.stringify_sql(name)
-    dob = formatting.stringify_sql(dob)
-    friendid = select_values("FRIENDID", "FRIEND", where="USERID=" + userid + " AND NAME=" + name + " AND DOB=" + dob,
-                             state=state)
-    return friendid
-
-
 def update_table(table, set, where):
     sqlcommand = "UPDATE " + table + " SET " + set + " WHERE " + where
     conn = get_connection()
@@ -175,7 +167,7 @@ def row_to_dict(rows):
     for row in rows:
         obj = {}
         for key in row.keys():
-            obj[key] = row[key]
+            obj[str(key).lower()] = row[key]
         l.append(obj)
     print l
     return l

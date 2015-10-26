@@ -1,5 +1,9 @@
 #!flask/bin/python
-from flask import Flask, jsonify, request, abort
+#The primary application for the Flask api server
+#Houses the routing functionality
+
+from flask import Flask, jsonify, request, abort, Response
+from functools import wraps
 from amazon.api import AmazonAPI
 from Crypto.Cipher import AES
 import sqlite3
@@ -8,15 +12,16 @@ import hashlib
 import modules.giftlydb as giftlydb
 import modules.formatting as formatting
 import modules.encryption as encryption
+import modules.authdb as authdb
 
 #Open the config file
 with open('config.json') as config_json:
     data = json.load(config_json)
 
 #Amazon keys
-AMAZON_SECRET_KEY= data['amazon']['secret_key']
-AMAZON_ACCESS_KEY= data['amazon']['access_key']
-AMAZON_ASSOC_TAG=  data['amazon']['assoc_tag']
+AMAZON_SECRET_KEY= str(data['amazon']['secret_key'])
+AMAZON_ACCESS_KEY= str(data['amazon']['access_key'])
+AMAZON_ASSOC_TAG=  str(data['amazon']['assoc_tag'])
 #Encryption keys
 AES_KEY = hashlib.sha256(data['encryption']['aes_key']).digest()
 INIT_VECTOR = data['encryption']['init_vec']
@@ -31,6 +36,9 @@ giftlydb._init_db(giftlydb.get_connection())
 
 app = Flask(__name__)
 
+def check_auth(email, key):
+    return authdb.authenticate(email, key)
+
 @app.route('/')
 def index():
 	return "Index"
@@ -41,7 +49,8 @@ def index():
 def test():
     values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, PASSWORD, STATE", table="User")
     if values:
-        return jsonify({"users":giftlydb.row_to_dict(values)})
+        value_dict = giftlydb.row_to_dict(values)
+        return jsonify({"users":value_dict})
 
 @app.route('/api/user/registeruser', methods = ['POST'])
 def register_user_():
@@ -76,7 +85,7 @@ def login_user():
     else:
         login_auth = False
 
-    return jsonify({'authenticated':login_auth, 'response':200})
+    return jsonify({'authenticated':login_auth, 'email': email, 'response':200})
 
 #LOGIN/REGISTRATION
 #
@@ -124,21 +133,6 @@ def get_user_friend():
         return json.dumps(giftlydb.row_to_dict(value))
     else:
         return jsonify({"userid":userid, "friendid":friendid, "exists":"False", "response":200})
-
-#Get friendid based on userid, name, and dob
-#NOTE: if 2+ friends share the same name and dob, all will be returned
-#The end user will have to decide which friend is intended
-@app.route('/api/user/getfriendid', methods=['POST'])
-def get_user_friend_id():
-    js = request.get_json(force=True)
-    userid = js.get('userid')
-    name = js.get('name')
-    dob = js.get('dob')
-    fids = giftlydb.get_friendid_by_name_and_dob(userid, name, dob)
-    ids = []
-    for i, fid in enumerate(fids):
-        ids.append(fids[i]['FRIENDID'])
-    return jsonify({'friendid':ids, 'numids':len(ids), 'response':200})
 
 #Performs a logical delete on a given user
 @app.route('/api/user/deleteuser', methods=['POST'])
@@ -205,15 +199,17 @@ def add_friend_gift():
 
 @app.route('/api/lookup/similar/', methods=['GET'])
 def get_similar_items():
-	items = str(request.form.get('items')).split(',') if request.form.get('items') else None
-	numitems = int(request.form.get('numitems')) if request.form.get('numitems') else 10
-	category = str(request.form.get('category')) if request.form.get('category') else 'All'
+    keywords = str(request.args.get('keywords')).split(',') if request.args.get('keywords') else None
+    numitems = int(request.args.get('numitems')) if request.args.get('numitems') else 10
+    category = str(request.args.get('category')) if request.args.get('category') else 'All'
 
-	products = amazon.search_n(numitems, Keywords=items, SearchIndex=category)
-	product_dict = {}
-	for product in products:
-		product_dict[product.asin] = product.title
-	return jsonify({'results': product_dict})
+    print "%d items found with keywords %s in the %s category" % (numitems, keywords, category)
+
+    products = amazon.search_n(numitems, Keywords=keywords, SearchIndex=category)
+    product_dict = {}
+    for product in products:
+        product_dict[product.asin] = product.title
+    return jsonify({'results': product_dict})
 
 #AMAZON API CALLS
 
