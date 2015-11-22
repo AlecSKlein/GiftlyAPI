@@ -176,3 +176,31 @@ def row_to_dict(rows):
 def generate_uuid():
     id = str(uuid.uuid4().int)[0:12]
     return id
+
+def get_user_dict(email):
+    values = select_values(values="USERID, EMAIL, FNAME, LNAME, STATE", table="User", where="EMAIL="+email)
+    if values:
+        value_dict = row_to_dict(values)
+        userid = value_dict[0]['userid']
+        email = value_dict[0]['email']
+        fname = value_dict[0]['fname']
+        lname = value_dict[0]['lname']
+        return formatting.format_user_json(userid=userid, email=email, fname=fname, lname=lname)
+
+def get_friend_dict(name):
+    values = select_values(values="FRIENDID, USERID, NAME, DOB", table="User", where="NAME="+name)
+    if values:
+        value_dict = row_to_dict(values)
+        friendid = value_dict[0]['friendid']
+        userid = value_dict[0]['userid']
+        name = value_dict[0]['name']
+        dob = value_dict[0]['dob']
+        return formatting.format_friend_json(friendid=friendid, userid=userid, name=name, dob=dob)
+
+def get_interest_dict(interestname):
+    values = select_values(values="INTERESTNAME, FRIENDID", table="Interest", where="INTERESTNAME="+interestname)
+    if values:
+        value_dict = row_to_dict(values)
+        interestname = value_dict[0]['interestname']
+        friendid = value_dict[0]['friendid']
+        return formatting.format_interest_json(interestname=interestname, friendid=friendid)

@@ -120,16 +120,7 @@ def get_user():
     js = request.get_json(force=True)
     email = js.get('email')
     email = formatting.stringify_sql(email)
-    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, STATE", table="User", where="EMAIL="+email)
-    if values:
-        value_dict = giftlydb.row_to_dict(values)
-        userid = value_dict[0]['userid']
-        email = value_dict[0]['email']
-        fname = value_dict[0]['fname']
-        lname = value_dict[0]['lname']
-        print email
-        print userid
-        return jsonify(formatting.format_user_json(userid=userid, email=email, fname=fname, lname=lname))
+    return jsonify(giftlydb.get_user_dict(email))
 
 #LOGIN/REGISTRATION
 #
@@ -149,7 +140,7 @@ def add_user_friend():
         dob = formatting.stringify_sql(dob)
         success = giftlydb.insert_friend((giftlydb.generate_uuid(), userid, name, dob, '1'))
 
-    return formatting.format_friend_json()
+    return jsonify(giftlydb.get_friend_dict(name))
 
 #OUTDATED method to get all friend details of a user based on userid
 @app.route('/api/user/getallfriends', methods=['POST'])
@@ -158,9 +149,18 @@ def get_user_friends():
     userid = js.get('userid')
     #friendid = js.get('friendid')
     if userid:
-        values = giftlydb.select_values(values="FRIENDID, USERID, NAME, DOB, STATE", table="Friend", where=("USERID="+formatting.stringify_sql(userid)))
+        print userid
+        values = giftlydb.select_values(values="FRIENDID, USERID, NAME, DOB, STATE", table="Friend", where=("USERID="+str(userid)))
         if values:
-            return jsonify({"friends":giftlydb.row_to_dict(values)})
+            all_friends = {}
+            for dict in values:
+                friendid=dict['friendid']
+                userid=dict['userid']
+                name=dict['name']
+                dob=dict['dob']
+                all_friends[friendid] = formatting.format_friend_json(friendid=friendid, userid=userid, name=name, dob=dob)
+            print all_friends
+            return jsonify(all_friends)
         else:
             return jsonify({"userid":userid, "numfriends":0, "response":200})
     else:
