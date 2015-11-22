@@ -47,10 +47,21 @@ def index():
 
 @app.route('/api/user/getusers', methods = ['GET'])
 def test():
-    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, PASSWORD, STATE", table="User")
+    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, STATE", table="User")
     if values:
         value_dict = giftlydb.row_to_dict(values)
-        return jsonify({"users":value_dict})
+        dicts = {}
+        for dict in value_dict:
+            value_dict = giftlydb.row_to_dict(values)
+            userid = dict['userid']
+            email = dict['email']
+            lname = dict['lname']
+            fname = dict['fname']
+            dicts[email] = formatting.format_user_json(userid=userid, email=email, lname=lname, fname=fname)
+
+        print "dict"
+        print dicts
+        return jsonify({"users":dicts})
 
 @app.route('/api/user/registeruser', methods = ['POST'])
 def register_user_():
@@ -68,7 +79,13 @@ def register_user_():
     email = formatting.stringify_sql(email)
 
     if giftlydb.insert_user((giftlydb.generate_uuid(), email, fname, lname, formatting.stringify_sql(encryption.hash_password(password)), '1')):
-        return jsonify({'email':email, 'response':200})
+        values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME", table="User", where="EMAIL="+email)
+        value_dict = giftlydb.row_to_dict(values)
+        userid = value_dict[0]['userid']
+        email = value_dict[0]['email']
+        lname = value_dict[0]['lname']
+        fname = value_dict[0]['fname']
+        return jsonify(formatting.format_user_json(userid=userid, email=email, lname=lname, fname=fname))
     else:
         return abort(400)
 
@@ -77,15 +94,42 @@ def login_user():
     js = request.get_json(force=True)
     email = js.get('email')
     password = js.get('password')
-    hashed_password = giftlydb.select_values("PASSWORD", "USER", "EMAIL=" + formatting.stringify_sql(email))[0]['PASSWORD']
-
+    if giftlydb.row_exists("EMAIL", 'User', "EMAIL="+formatting.stringify_sql(email), state='1'):
+        hashed_password = giftlydb.select_values("PASSWORD", "USER", "EMAIL=" + formatting.stringify_sql(email))[0]['PASSWORD']
+    else:
+        print 'abort'
+        return abort(400)
     login_auth = None
     if encryption.check_hashed_password(password, hashed_password):
         login_auth = True
     else:
         login_auth = False
 
-    return jsonify({'authenticated':login_auth, 'email': email, 'response':200})
+    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, STATE", table="User", where="EMAIL="+email)
+    if values:
+        value_dict = giftlydb.row_to_dict(values)
+        userid = value_dict[0]['userid']
+        email = value_dict[0]['email']
+        fname = value_dict[0]['fname']
+        lname = value_dict[0]['lname']
+
+    return jsonify(formatting.format_user_json(userid=userid, email=email, fname=fname, lname=lname, auth=login_auth))
+
+@app.route('/api/user/getuser', methods = ['POST'])
+def get_user():
+    js = request.get_json(force=True)
+    email = js.get('email')
+    email = formatting.stringify_sql(email)
+    values = giftlydb.select_values(values="USERID, EMAIL, FNAME, LNAME, STATE", table="User", where="EMAIL="+email)
+    if values:
+        value_dict = giftlydb.row_to_dict(values)
+        userid = value_dict[0]['userid']
+        email = value_dict[0]['email']
+        fname = value_dict[0]['fname']
+        lname = value_dict[0]['lname']
+        print email
+        print userid
+        return jsonify(formatting.format_user_json(userid=userid, email=email, fname=fname, lname=lname))
 
 #LOGIN/REGISTRATION
 #
@@ -105,7 +149,7 @@ def add_user_friend():
         dob = formatting.stringify_sql(dob)
         success = giftlydb.insert_friend((giftlydb.generate_uuid(), userid, name, dob, '1'))
 
-    return jsonify({'inserted':success, 'response': 200})
+    return formatting.format_friend_json()
 
 #OUTDATED method to get all friend details of a user based on userid
 @app.route('/api/user/getallfriends', methods=['POST'])
